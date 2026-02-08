@@ -1,17 +1,22 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"weather-api-wrapper/api/dto"
 	"weather-api-wrapper/weather"
 )
 
-type WeatherHandler struct {
-	Service *weather.WeatherService
+type WeatherServiceInterface interface {
+	GetWeather(ctx context.Context, location string) (*weather.WeatherResponse, error)
 }
 
-func NewWeatherHandler(service *weather.WeatherService) *WeatherHandler {
+type WeatherHandler struct {
+	Service WeatherServiceInterface
+}
+
+func NewWeatherHandler(service WeatherServiceInterface) *WeatherHandler {
 	return &WeatherHandler{
 		Service: service,
 	}
@@ -35,10 +40,11 @@ func (wh *WeatherHandler) GetWeatherHandler(w http.ResponseWriter, r *http.Reque
 		Temperature: weatherData.Current.TempC,
 		Condition:   weatherData.Current.Condition.Text,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(weatherResponseBody)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }

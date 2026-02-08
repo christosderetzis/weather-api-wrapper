@@ -4,37 +4,35 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"weather-api-wrapper/internal/cache"
-
-	"github.com/redis/go-redis/v9"
+	"time"
 )
 
 type WeatherService struct {
-	WeatherClient *WeatherClient
-	Cache         *redis.Client
+	Client     WeatherClientInterface
+	Repository WeatherRepositoryInterface
 }
 
-func NewWeatherService(weatherClient *WeatherClient, cache *redis.Client) *WeatherService {
+func NewWeatherService(weatherClient WeatherClientInterface, repository WeatherRepositoryInterface) *WeatherService {
 	return &WeatherService{
-		WeatherClient: weatherClient,
-		Cache:         cache,
+		Client:     weatherClient,
+		Repository: repository,
 	}
 }
 
 func (ws *WeatherService) GetWeather(ctx context.Context, location string) (*WeatherResponse, error) {
-	cachedWeather, err := cache.Get[WeatherResponse](ctx, *ws.Cache, location)
+	cachedWeather, err := ws.Repository.GetWeatherFromCache(ctx, location)
 	if err == nil && cachedWeather != nil {
 		log.Println("Cache hit for location:", location)
 		return cachedWeather, nil
 	}
 
 	log.Println("Cache miss for location:", location)
-	weather, err := ws.WeatherClient.FetchWeatherFromApi(location)
+	weather, err := ws.Client.FetchWeatherFromApi(location)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := cache.Set(ctx, ws.Cache, location, weather); err != nil {
+	if err := ws.Repository.SetWeatherInCache(ctx, location, weather, time.Hour*12); err != nil {
 		fmt.Printf("Warning: failed to cache weather data: %v\n", err)
 	}
 

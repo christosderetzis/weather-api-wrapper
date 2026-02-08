@@ -12,10 +12,17 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	_ = godotenv.Load() // Load .env file if it exists
+	_ = godotenv.Load()
 
 	return &Config{
-		ApiKey:     os.Getenv("WEATHER_API_KEY"),
-		BaseApiUrl: os.Getenv("WEATHER_API_BASE_URL"),
+		ApiKey:     getEnv("WEATHER_API_KEY", "test_api_key"),
+		BaseApiUrl: getEnv("WEATHER_API_BASE_URL", "https://base-url.com"),
 	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

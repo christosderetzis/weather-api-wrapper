@@ -19,8 +19,11 @@ func main() {
 	}
 
 	configuration := config.LoadConfig()
+
+	// dependency injection
 	weatherClient := weather.NewWeatherClient(configuration.ApiKey, configuration.BaseApiUrl)
-	weatherService := weather.NewWeatherService(weatherClient, redisClient)
+	weatherRepository := weather.NewWeatherRepository(redisClient)
+	weatherService := weather.NewWeatherService(weatherClient, weatherRepository)
 	weatherHandler := handler.NewWeatherHandler(weatherService)
 
 	router := routes.SetupRoutes(weatherHandler)
