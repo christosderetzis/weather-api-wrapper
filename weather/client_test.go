@@ -1,6 +1,7 @@
 package weather
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,7 +75,7 @@ func TestWeatherClient_FetchWeatherFromApi(t *testing.T) {
 
 			client := NewWeatherClient("test-key", server.URL)
 
-			result, err := client.FetchWeatherFromApi(tt.city)
+			result, err := client.FetchWeatherFromApi(context.Background(), tt.city)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -91,7 +92,25 @@ func TestWeatherClient_FetchWeatherFromApi(t *testing.T) {
 func TestWeatherClient_FetchWeatherFromApi_HttpError(t *testing.T) {
 	client := NewWeatherClient("test-key", "http://invalid.invalid.invalid:99999")
 
-	_, err := client.FetchWeatherFromApi("London")
+	_, err := client.FetchWeatherFromApi(context.Background(), "London")
+
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrorFailedToFetchWeather)
+}
+
+func TestWeatherClient_FetchWeatherFromApi_ContextCanceled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Simulate slow response
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	client := NewWeatherClient("test-key", server.URL)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err := client.FetchWeatherFromApi(ctx, "London")
 
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrorFailedToFetchWeather)

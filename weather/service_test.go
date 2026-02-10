@@ -14,8 +14,8 @@ type MockWeatherClient struct {
 	mock.Mock
 }
 
-func (m *MockWeatherClient) FetchWeatherFromApi(location string) (*WeatherResponse, error) {
-	args := m.Called(location)
+func (m *MockWeatherClient) FetchWeatherFromApi(ctx context.Context, location string) (*WeatherResponse, error) {
+	args := m.Called(ctx, location)
 
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -107,7 +107,7 @@ func TestGetWeather_CacheMiss_Success(t *testing.T) {
 		Return(nil, errors.New("cache miss"))
 
 	client.
-		On("FetchWeatherFromApi", location).
+		On("FetchWeatherFromApi", ctx, location).
 		Return(expected, nil)
 
 	repo.
@@ -143,7 +143,7 @@ func TestGetWeather_ApiError(t *testing.T) {
 		Return(nil, errors.New("cache miss"))
 
 	client.
-		On("FetchWeatherFromApi", location).
+		On("FetchWeatherFromApi", ctx, location).
 		Return(nil, errors.New("api down"))
 
 	service := NewWeatherService(client, repo)
@@ -187,7 +187,7 @@ func TestGetWeather_CacheSetError(t *testing.T) {
 		Return(nil, errors.New("cache miss"))
 
 	client.
-		On("FetchWeatherFromApi", location).
+		On("FetchWeatherFromApi", ctx, location).
 		Return(expected, nil)
 
 	repo.

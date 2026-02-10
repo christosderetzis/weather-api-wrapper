@@ -1,6 +1,7 @@
 package weather
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,7 @@ var (
 )
 
 type WeatherClientInterface interface {
-	FetchWeatherFromApi(location string) (*WeatherResponse, error)
+	FetchWeatherFromApi(ctx context.Context, location string) (*WeatherResponse, error)
 }
 
 type WeatherClientImpl struct {
@@ -32,12 +33,19 @@ func NewWeatherClient(apiKey string, baseUrl string) *WeatherClientImpl {
 	}
 }
 
-func (wc *WeatherClientImpl) FetchWeatherFromApi(location string) (*WeatherResponse, error) {
-	// Implementation goes here
+func (wc *WeatherClientImpl) FetchWeatherFromApi(ctx context.Context, location string) (*WeatherResponse, error) {
 	reqURL := fmt.Sprintf("%s?key=%s&q=%s&aqi=no", wc.BaseUrl, wc.ApiKey, url.QueryEscape(location))
 
-	resp, err := http.Get(reqURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrorFailedToFetchWeather, err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("%w: %v", ErrorFailedToFetchWeather, ctx.Err())
+		}
 		return nil, ErrorFailedToFetchWeather
 	}
 	defer resp.Body.Close()

@@ -27,7 +27,7 @@ func (ws *WeatherService) GetWeather(ctx context.Context, location string) (*Wea
 	}
 
 	log.Println("Cache miss for location:", location)
-	weather, err := ws.Client.FetchWeatherFromApi(location)
+	weather, err := ws.Client.FetchWeatherFromApi(ctx, location)
 	if err != nil {
 		return nil, err
 	}
