@@ -3,15 +3,16 @@ package routes
 import (
 	"net/http"
 	"weather-api-wrapper/api/handler"
-	"weather-api-wrapper/api/middleware"
+	"weather-api-wrapper/api/middleware/logging"
+	"weather-api-wrapper/api/middleware/rate_limiter"
 )
 
 func SetupRoutes(handler *handler.WeatherHandler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/weather", handler.GetWeatherHandler)
 
-	rateLimiter := middleware.NewRateLimiter(30)
+	rateLimiter := rate_limiter.NewRateLimiter(30)
 	withRateLimit := rateLimiter.Middleware(mux)
 
-	return middleware.LoggingMiddleware(withRateLimit)
+	return logging.LoggingMiddleware(withRateLimit)
 }
