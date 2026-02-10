@@ -49,6 +49,22 @@ GET /weather?city={city}
 }
 ```
 
+**Rate Limiting:**
+- Maximum 30 requests per minute per IP address
+- Returns `429 Too Many Requests` when limit is exceeded
+
+## Features
+
+### Structured Logging
+All HTTP requests are logged with structured format:
+```
+[2026-02-10 15:04:05] GET /weather?city=London 200
+[2026-02-10 15:04:12] GET /weather?city=Paris 200
+[2026-02-10 15:05:01] GET /weather?city=Tokyo 429
+```
+
+Format: `[timestamp] METHOD path status_code`
+
 ## Testing
 
 ```bash
@@ -62,6 +78,7 @@ go test ./...
 ├── api/
 │   ├── dto/          # Data transfer objects
 │   ├── handler/      # HTTP handlers
+│   ├── middleware/   # HTTP middleware (rate limiting, logging)
 │   └── routes/       # Route definitions
 ├── cmd/server/       # Application entrypoint
 ├── docker/           # Docker compose files
