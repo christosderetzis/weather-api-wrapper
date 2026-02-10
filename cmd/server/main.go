@@ -12,13 +12,14 @@ import (
 )
 
 func main() {
-	redisClient, err := cache.InitRedisClient("localhost:6379")
+	configuration := config.LoadConfig()
+
+	// initialize Redis client
+	redisClient, err := cache.InitRedisClient(fmt.Sprintf("%s:%s", configuration.RedisHost, configuration.RedisPort))
 	if err != nil {
 		fmt.Printf("Failed to connect to Redis: %v\n", err)
 		return
 	}
-
-	configuration := config.LoadConfig()
 
 	// dependency injection
 	weatherClient := weather.NewWeatherClient(configuration.ApiKey, configuration.BaseApiUrl)
