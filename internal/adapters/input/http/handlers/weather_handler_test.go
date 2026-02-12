@@ -75,7 +75,7 @@ func TestGetWeatherHandler_InvalidLocation(t *testing.T) {
 	handler := NewWeatherHandler(useCase)
 	ctx := context.Background()
 
-	req := httptest.NewRequest(http.MethodGet, "/weather?city=  ", nil)
+	req := httptest.NewRequest(http.MethodGet, "/weather?city=%20%20", nil)
 	rec := httptest.NewRecorder()
 
 	useCase.
@@ -206,7 +206,7 @@ func TestGetWeatherHandler_SpecialCharactersInCity(t *testing.T) {
 	handler := NewWeatherHandler(useCase)
 	ctx := context.Background()
 
-	req := httptest.NewRequest(http.MethodGet, "/weather?city=São Paulo", nil)
+	req := httptest.NewRequest(http.MethodGet, "/weather?city=S%C3%A3o%20Paulo", nil)
 	rec := httptest.NewRecorder()
 
 	weatherData := &weather.Weather{
