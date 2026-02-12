@@ -71,19 +71,78 @@ Format: `[timestamp] METHOD path status_code`
 go test ./...
 ```
 
+## Architecture
+
+This project implements **Hexagonal Architecture** (Ports and Adapters pattern), providing clear separation between business logic and infrastructure concerns.
+
+### Key Principles
+
+- **Domain Layer**: Pure business logic with zero infrastructure dependencies
+- **Ports**: Interfaces defining boundaries (input ports for use cases, output ports for dependencies)
+- **Adapters**: Infrastructure implementations (HTTP handlers, external APIs, databases)
+- **Dependency Inversion**: All dependencies point inward toward the domain
+
+### Dependency Flow
+
+```
+Domain (internal/domain/*)          ← No external dependencies
+  ↑
+Ports (internal/ports/*)            ← Defines interfaces, depends on domain
+  ↑
+Application (internal/application/*) ← Implements use cases, depends on ports
+  ↑
+Adapters (internal/adapters/*)      ← Implements ports, depends on everything above
+  ↑
+Main (cmd/server/main.go)           ← Wires everything together
+```
+
 ## Project Structure
 
 ```
-.
-├── api/
-│   ├── dto/          # Data transfer objects
-│   ├── handler/      # HTTP handlers
-│   ├── middleware/   # HTTP middleware (rate limiting, logging)
-│   └── routes/       # Route definitions
-├── cmd/server/       # Application entrypoint
-├── docker/           # Docker compose files
+weather-api-wrapper/
+├── cmd/
+│   └── server/
+│       └── main.go                    # Application composition root
+│
 ├── internal/
-│   ├── cache/        # Redis client
-│   └── config/       # Configuration
-└── weather/          # Weather domain (client, service, repository)
+│   ├── domain/                        # CORE - Pure business logic
+│   │   └── weather/
+│   │       ├── weather.go             # Rich domain entities with behavior
+│   │       ├── errors.go              # Domain-specific errors
+│   │       └── validation.go          # Business validation rules
+│   │
+│   ├── ports/                         # PORTS - Interfaces
+│   │   ├── input/
+│   │   │   └── weather_service.go     # GetWeatherUseCase interface
+│   │   └── output/
+│   │       ├── weather_provider.go    # External weather API port
+│   │       └── weather_cache.go       # Cache port
+│   │
+│   ├── application/                   # Use case implementations
+│   │   └── weather/
+│   │       ├── service.go             # Implements GetWeatherUseCase
+│   │       └── service_test.go        # Unit tests with mocked ports
+│   │
+│   └── adapters/                      # ADAPTERS - Infrastructure
+│       ├── input/                     # Primary adapters (drivers)
+│       │   └── http/
+│       │       ├── handlers/          # HTTP handlers
+│       │       ├── dto/               # HTTP-specific DTOs
+│       │       ├── middleware/        # Logging, rate limiting
+│       │       └── routes/            # Route configuration
+│       │
+│       └── output/                    # Secondary adapters (driven)
+│           ├── weatherapi/            # WeatherAPI.com client
+│           ├── redis/                 # Redis cache implementation
+│           └── config/                # Configuration loader
+│
+└── docker/
+    └── docker-compose.yml             # Redis container
 ```
+
+### Architecture Benefits
+
+- ✅ **Testability**: Domain and application layers tested without infrastructure
+- ✅ **Flexibility**: Easy to swap implementations (different cache, API, HTTP framework)
+- ✅ **Maintainability**: Clear separation of concerns, SOLID principles
+- ✅ **Independence**: Business logic isolated from frameworks and external services
