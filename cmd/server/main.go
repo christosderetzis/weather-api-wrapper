@@ -3,37 +3,50 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"weather-api-wrapper/api/handler"
-	"weather-api-wrapper/api/routes"
-	"weather-api-wrapper/internal/cache"
-	"weather-api-wrapper/internal/config"
-	"weather-api-wrapper/weather"
+
+	"weather-api-wrapper/internal/adapters/input/http/handlers"
+	"weather-api-wrapper/internal/adapters/input/http/routes"
+	"weather-api-wrapper/internal/adapters/output/config"
+	"weather-api-wrapper/internal/adapters/output/redis"
+	"weather-api-wrapper/internal/adapters/output/weatherapi"
+	weatherapp "weather-api-wrapper/internal/application/weather"
 )
 
 func main() {
-	configuration := config.LoadConfig()
+	// 1. Load configuration (configuration adapter)
+	cfg := config.Load()
+	log.Println("Configuration loaded successfully")
 
-	// initialize Redis client
-	redisClient, err := cache.InitRedisClient(fmt.Sprintf("%s:%s", configuration.RedisHost, configuration.RedisPort))
+	// 2. Initialize output adapters (secondary/driven)
+
+	// Initialize Redis cache adapter
+	redisCache, err := redis.NewCache(cfg.RedisHost, cfg.RedisPort)
 	if err != nil {
-		fmt.Printf("Failed to connect to Redis: %v\n", err)
-		return
+		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
+	log.Println("Redis cache connected successfully")
 
-	// dependency injection
-	weatherClient := weather.NewWeatherClient(configuration.ApiKey, configuration.BaseApiUrl)
-	weatherRepository := weather.NewWeatherRepository(redisClient)
-	weatherService := weather.NewWeatherService(weatherClient, weatherRepository)
-	weatherHandler := handler.NewWeatherHandler(weatherService)
+	// Initialize Weather API client adapter
+	weatherAPIClient := weatherapi.NewClient(cfg.WeatherAPIKey, cfg.WeatherAPIBaseURL)
+	log.Println("Weather API client initialized")
 
+	// 3. Initialize application service (core business logic)
+	weatherService := weatherapp.NewService(weatherAPIClient, redisCache)
+	log.Println("Weather application service initialized")
+
+	// 4. Initialize input adapter (primary/driving)
+	weatherHandler := handlers.NewWeatherHandler(weatherService)
+	log.Println("HTTP handler initialized")
+
+	// 5. Setup routes with middleware chain
 	router := routes.SetupRoutes(weatherHandler)
+	log.Println("Routes configured with middleware")
 
 	port := ":8080"
 	server := &http.Server{
@@ -80,10 +93,10 @@ func main() {
 	}
 
 	// Close Redis connection
-	if err := redisClient.Close(); err != nil {
-		log.Printf("Redis client close error: %v", err)
+	if err := redisCache.Close(); err != nil {
+		log.Printf("Redis cache close error: %v", err)
 	} else {
-		log.Println("Redis connection closed")
+		log.Println("Redis cache closed")
 	}
 
 	log.Println("Shutdown complete")
