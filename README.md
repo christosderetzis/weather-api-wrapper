@@ -7,22 +7,54 @@ A Go REST API that wraps an external weather API with Redis caching. Inspiration
 ## Prerequisites
 
 - Go 1.21+
-- Docker (for Redis)
+- Docker and Docker Compose
 
 ## Configuration
 
-Set the following environment variables (or create a `.env` file):
+Copy `.env.example` to `.env` and set your values:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `WEATHER_API_KEY` | API key for weather provider | `test_api_key` |
-| `WEATHER_API_BASE_URL` | Base URL for weather API | `https://base-url.com` |
+| `WEATHER_API_BASE_URL` | Base URL for weather API | `https://api.weatherapi.com/v1/current.json` |
+| `REDIS_HOST` | Redis hostname | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
 
 ## Running
 
-1. Start Redis:
+### Option 1: Full Stack with Docker Compose (Recommended)
+
+Run the entire stack (API, Redis, Prometheus, Grafana) with one command:
+
 ```bash
 docker compose -f docker/docker-compose.yml up -d
+```
+
+This starts:
+- **Weather API**: http://localhost:8080
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Redis**: localhost:6379
+
+To view logs:
+```bash
+docker compose -f docker/docker-compose.yml logs -f weather-api
+```
+
+To stop:
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+### Option 2: Local Development
+
+1. Start Redis:
+```bash
+docker compose -f docker/docker-compose.yml up -d redis
 ```
 
 2. Run the server:
@@ -53,6 +85,18 @@ GET /weather?city={city}
 - Maximum 30 requests per minute per IP address
 - Returns `429 Too Many Requests` when limit is exceeded
 
+### Metrics Endpoint
+
+```
+GET /metrics
+```
+
+Prometheus-formatted metrics including:
+- HTTP request counts and latency
+- Cache hit/miss rates
+- External API call performance
+- Rate limit violations
+
 ## Features
 
 ### Structured Logging
@@ -65,10 +109,51 @@ All HTTP requests are logged with structured format:
 
 Format: `[timestamp] METHOD path status_code`
 
+### Prometheus Metrics
+Comprehensive metrics exposed at `/metrics`:
+
+- **HTTP Metrics**
+  - `weather_api_http_requests_total` - Total HTTP requests by method, path, and status
+  - `weather_api_http_request_duration_seconds` - Request latency histogram
+
+- **Cache Metrics**
+  - `weather_api_cache_hits_total` - Total cache hits
+  - `weather_api_cache_misses_total` - Total cache misses
+  - `weather_api_cache_errors_total` - Total cache errors
+
+- **External API Metrics**
+  - `weather_api_external_api_calls_total` - External API calls by provider and status
+  - `weather_api_external_api_call_duration_seconds` - External API call latency
+
+- **Rate Limiting Metrics**
+  - `weather_api_rate_limit_exceeded_total` - Total rate limit violations
+
+### Grafana Dashboard
+Pre-configured dashboard with panels for:
+- Request rate and latency (p50, p95, p99)
+- Cache hit rate and operations
+- Error rates (4xx, 5xx)
+- External API performance
+- Rate limit events
+
+Access at http://localhost:3000 (admin/admin) when running via Docker Compose.
+
 ## Testing
 
+Run all tests:
 ```bash
 go test ./...
+```
+
+Run tests with coverage:
+```bash
+go test -coverprofile=coverage.out -covermode=atomic ./...
+go tool cover -html=coverage.out
+```
+
+Run linters (requires golangci-lint):
+```bash
+golangci-lint run --timeout=5m
 ```
 
 ## Architecture
@@ -136,8 +221,19 @@ weather-api-wrapper/
 │           ├── redis/                 # Redis cache implementation
 │           └── config/                # Configuration loader
 │
-└── docker/
-    └── docker-compose.yml             # Redis container
+├── docker/
+│   ├── docker-compose.yml             # Full stack (API, Redis, Prometheus, Grafana)
+│   ├── grafana/
+│   │   ├── dashboards/
+│   │   │   └── weather-api-dashboard.json # Pre-configured dashboard
+│   │   └── provisioning/              # Auto-provisioning configs
+│   │       ├── datasources/
+│   │       └── dashboards/
+│   └── prometheus/
+│       └── prometheus.yml             # Prometheus configuration
+│
+├── Dockerfile                         # Multi-stage production build
+└── .dockerignore                      # Docker build exclusions
 ```
 
 ### Architecture Benefits
