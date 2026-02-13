@@ -75,8 +75,7 @@ func (h *WeatherHandler) writeErrorJSON(w http.ResponseWriter, message string, s
 		Message: message,
 	}
 
-	if err := json.NewEncoder(w).Encode(errorResponse); err != nil {
-		// Fallback to plain text if JSON encoding fails
-		http.Error(w, message, statusCode)
-	}
+	// Attempt to encode JSON response
+	// Note: If encoding fails, headers are already sent so we can't recover gracefully
+	_ = json.NewEncoder(w).Encode(errorResponse)
 }
