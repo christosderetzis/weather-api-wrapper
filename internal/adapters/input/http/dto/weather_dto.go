@@ -10,6 +10,11 @@ type WeatherResponse struct {
 	Condition   string  `json:"condition_text"`
 }
 
+// ErrorResponse is the standard error response structure
+type ErrorResponse struct {
+	Message string `json:"message"`
+}
+
 // FromDomain maps domain weather data to HTTP response DTO
 // This keeps the HTTP layer decoupled from domain structure
 func FromDomain(w *weather.Weather) WeatherResponse {
