@@ -27,7 +27,7 @@ func (h *WeatherHandler) GetWeatherHandler(w http.ResponseWriter, r *http.Reques
 	// Validate required query parameter
 	city := r.URL.Query().Get("city")
 	if city == "" {
-		h.writeErrorJSON(w, "city query parameter is required", http.StatusBadRequest)
+		dto.WriteErrorJSON(w, "city query parameter is required", http.StatusBadRequest)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *WeatherHandler) GetWeatherHandler(w http.ResponseWriter, r *http.Reques
 	// Send JSON response
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.writeErrorJSON(w, "failed to encode response", http.StatusInternalServerError)
+		dto.WriteErrorJSON(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }
@@ -53,29 +53,15 @@ func (h *WeatherHandler) GetWeatherHandler(w http.ResponseWriter, r *http.Reques
 func (h *WeatherHandler) handleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, weather.ErrInvalidLocation):
-		h.writeErrorJSON(w, err.Error(), http.StatusBadRequest)
+		dto.WriteErrorJSON(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, weather.ErrWeatherNotFound):
-		h.writeErrorJSON(w, err.Error(), http.StatusNotFound)
+		dto.WriteErrorJSON(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, weather.ErrWeatherUnavailable):
-		h.writeErrorJSON(w, "weather service is currently unavailable", http.StatusServiceUnavailable)
+		dto.WriteErrorJSON(w, "weather service is currently unavailable", http.StatusServiceUnavailable)
 	case errors.Is(err, weather.ErrCacheUnavailable):
 		// Cache errors shouldn't reach here, but if they do, treat as server error
-		h.writeErrorJSON(w, "internal server error", http.StatusInternalServerError)
+		dto.WriteErrorJSON(w, "internal server error", http.StatusInternalServerError)
 	default:
-		h.writeErrorJSON(w, "internal server error", http.StatusInternalServerError)
+		dto.WriteErrorJSON(w, "internal server error", http.StatusInternalServerError)
 	}
-}
-
-// writeErrorJSON writes a JSON error response
-func (h *WeatherHandler) writeErrorJSON(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	errorResponse := dto.ErrorResponse{
-		Message: message,
-	}
-
-	// Attempt to encode JSON response
-	// Note: If encoding fails, headers are already sent so we can't recover gracefully
-	_ = json.NewEncoder(w).Encode(errorResponse)
 }

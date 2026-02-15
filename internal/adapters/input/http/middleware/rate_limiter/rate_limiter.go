@@ -3,9 +3,11 @@ package rate_limiter
 import (
 	"net/http"
 	"sync"
+	"weather-api-wrapper/internal/adapters/input/http/dto"
+
+	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 
 	"golang.org/x/time/rate"
-	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 )
 
 type RateLimiter struct {
@@ -43,7 +45,7 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 
 		if !limiter.Allow() {
 			metrics.RateLimitExceeded.Inc()
-			http.Error(w, "Rate limit exceeded. Maximum 30 requests per minute allowed.", http.StatusTooManyRequests)
+			dto.WriteErrorJSON(w, "Rate limit exceeded. Maximum 30 requests per minute allowed.", http.StatusTooManyRequests)
 			return
 		}
 
