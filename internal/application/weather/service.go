@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 	"weather-api-wrapper/internal/domain/weather"
 	"weather-api-wrapper/internal/ports/output"
 )
@@ -43,11 +44,18 @@ func (s *Service) GetWeather(ctx context.Context, location string) (*weather.Wea
 	cachedWeather, err := s.cache.Get(ctx, location)
 	if err == nil && cachedWeather != nil {
 		log.Printf("Cache hit for location: %s", location)
+		metrics.CacheHitsTotal.Inc()
 		return cachedWeather, nil
+	}
+
+	if err != nil {
+		log.Printf("Cache error for location %s: %v", location, err)
+		metrics.CacheErrorsTotal.Inc()
 	}
 
 	// Cache miss - fetch from weather provider
 	log.Printf("Cache miss for location: %s", location)
+	metrics.CacheMissesTotal.Inc()
 	weatherData, err := s.weatherProvider.FetchWeather(ctx, location)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", weather.ErrWeatherUnavailable, err)

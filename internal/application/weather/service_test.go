@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 	"weather-api-wrapper/internal/domain/weather"
 )
 
@@ -79,6 +81,9 @@ func TestGetWeather_CacheHit(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric value
+	initialCacheHits := testutil.ToFloat64(metrics.CacheHitsTotal)
+
 	// Act
 	result, err := service.GetWeather(ctx, location)
 
@@ -91,6 +96,9 @@ func TestGetWeather_CacheHit(t *testing.T) {
 	// Verify provider was never called (cache hit)
 	provider.AssertNotCalled(t, "FetchWeather", mock.Anything, mock.Anything)
 	cache.AssertExpectations(t)
+
+	// Verify cache hit metric was incremented
+	assert.Equal(t, initialCacheHits+1, testutil.ToFloat64(metrics.CacheHitsTotal))
 }
 
 func TestGetWeather_CacheMiss_Success(t *testing.T) {
@@ -108,6 +116,10 @@ func TestGetWeather_CacheMiss_Success(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric values
+	initialCacheMisses := testutil.ToFloat64(metrics.CacheMissesTotal)
+	initialCacheErrors := testutil.ToFloat64(metrics.CacheErrorsTotal)
+
 	// Act
 	result, err := service.GetWeather(ctx, location)
 
@@ -119,6 +131,10 @@ func TestGetWeather_CacheMiss_Success(t *testing.T) {
 
 	provider.AssertExpectations(t)
 	cache.AssertExpectations(t)
+
+	// Verify cache miss and error metrics were incremented
+	assert.Equal(t, initialCacheMisses+1, testutil.ToFloat64(metrics.CacheMissesTotal))
+	assert.Equal(t, initialCacheErrors+1, testutil.ToFloat64(metrics.CacheErrorsTotal))
 }
 
 func TestGetWeather_ProviderError(t *testing.T) {
@@ -135,6 +151,10 @@ func TestGetWeather_ProviderError(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric values
+	initialCacheMisses := testutil.ToFloat64(metrics.CacheMissesTotal)
+	initialCacheErrors := testutil.ToFloat64(metrics.CacheErrorsTotal)
+
 	// Act
 	result, err := service.GetWeather(ctx, location)
 
@@ -145,6 +165,10 @@ func TestGetWeather_ProviderError(t *testing.T) {
 
 	// Cache Set should not be called when provider fails
 	cache.AssertNotCalled(t, "Set", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	// Verify cache metrics were incremented
+	assert.Equal(t, initialCacheMisses+1, testutil.ToFloat64(metrics.CacheMissesTotal))
+	assert.Equal(t, initialCacheErrors+1, testutil.ToFloat64(metrics.CacheErrorsTotal))
 }
 
 func TestGetWeather_CacheSetError_StillReturnsData(t *testing.T) {
@@ -163,6 +187,10 @@ func TestGetWeather_CacheSetError_StillReturnsData(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric values
+	initialCacheMisses := testutil.ToFloat64(metrics.CacheMissesTotal)
+	initialCacheErrors := testutil.ToFloat64(metrics.CacheErrorsTotal)
+
 	// Act
 	result, err := service.GetWeather(ctx, location)
 
@@ -174,6 +202,10 @@ func TestGetWeather_CacheSetError_StillReturnsData(t *testing.T) {
 
 	provider.AssertExpectations(t)
 	cache.AssertExpectations(t)
+
+	// Verify cache metrics were incremented
+	assert.Equal(t, initialCacheMisses+1, testutil.ToFloat64(metrics.CacheMissesTotal))
+	assert.Equal(t, initialCacheErrors+1, testutil.ToFloat64(metrics.CacheErrorsTotal))
 }
 
 func TestGetWeather_InvalidLocation_Empty(t *testing.T) {
@@ -239,6 +271,10 @@ func TestGetWeather_UpdatedAtTimestamp(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric values
+	initialCacheMisses := testutil.ToFloat64(metrics.CacheMissesTotal)
+	initialCacheErrors := testutil.ToFloat64(metrics.CacheErrorsTotal)
+
 	// Act
 	beforeCall := time.Now()
 	result, err := service.GetWeather(ctx, location)
@@ -250,6 +286,10 @@ func TestGetWeather_UpdatedAtTimestamp(t *testing.T) {
 	// Verify that UpdatedAt was set to current time
 	assert.True(t, result.UpdatedAt.After(beforeCall) || result.UpdatedAt.Equal(beforeCall))
 	assert.True(t, result.UpdatedAt.Before(afterCall) || result.UpdatedAt.Equal(afterCall))
+
+	// Verify cache metrics were incremented
+	assert.Equal(t, initialCacheMisses+1, testutil.ToFloat64(metrics.CacheMissesTotal))
+	assert.Equal(t, initialCacheErrors+1, testutil.ToFloat64(metrics.CacheErrorsTotal))
 }
 
 func TestGetWeather_TTL(t *testing.T) {
@@ -269,10 +309,18 @@ func TestGetWeather_TTL(t *testing.T) {
 
 	service := NewService(provider, cache)
 
+	// Capture initial metric values
+	initialCacheMisses := testutil.ToFloat64(metrics.CacheMissesTotal)
+	initialCacheErrors := testutil.ToFloat64(metrics.CacheErrorsTotal)
+
 	// Act
 	_, err := service.GetWeather(ctx, location)
 
 	// Assert
 	assert.NoError(t, err)
 	cache.AssertExpectations(t)
+
+	// Verify cache metrics were incremented
+	assert.Equal(t, initialCacheMisses+1, testutil.ToFloat64(metrics.CacheMissesTotal))
+	assert.Equal(t, initialCacheErrors+1, testutil.ToFloat64(metrics.CacheErrorsTotal))
 }

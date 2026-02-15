@@ -1,0 +1,80 @@
+# golangci-lint configuration
+# For more information see: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    # Default linters
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis
+    - unused        # Check for unused code
+
+    # Additional recommended linters
+    - gofmt         # Check code is formatted
+    - goimports     # Check imports are formatted
+    - misspell      # Find commonly misspelled words
+    - revive        # General purpose linter
+    - gosec         # Security focused linter
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Find unused function parameters
+    - gocyclo       # Cyclomatic complexity
+    - dupl          # Code clone detection
+    - gocritic      # Opinionated linter
+    - exportloopref # Check for exported loop variable references
+    - nolintlint    # Ensure nolint directives are properly used
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15  # Warn on functions with complexity > 15
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # Can be too strict for some cases
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  revive:
+    rules:
+      - name: var-naming
+        disabled: false
+      - name: exported
+        disabled: false
+
+  gosec:
+    excludes:
+      - G404  # Use of weak random number generator - ok for non-crypto use
+
+  dupl:
+    threshold: 100  # Minimum token sequence for duplication
+
+issues:
+  exclude-dirs:
+    - vendor
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - gocyclo
+
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"  # Empty branch
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  sort-results: true
