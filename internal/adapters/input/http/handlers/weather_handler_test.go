@@ -63,7 +63,13 @@ func TestGetWeatherHandler_MissingCity(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "city query parameter is required")
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	// Verify JSON error response structure
+	var errResp dto.ErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Equal(t, "city query parameter is required", errResp.Message)
 
 	// Use case should not be called
 	useCase.AssertNotCalled(t, "GetWeather", mock.Anything, mock.Anything)
@@ -88,7 +94,13 @@ func TestGetWeatherHandler_InvalidLocation(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "invalid location")
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	// Verify JSON error response structure
+	var errResp dto.ErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Contains(t, errResp.Message, "invalid location")
 
 	useCase.AssertExpectations(t)
 }
@@ -112,7 +124,13 @@ func TestGetWeatherHandler_WeatherNotFound(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Contains(t, rec.Body.String(), "weather data not found")
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	// Verify JSON error response structure
+	var errResp dto.ErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Equal(t, "weather data not found", errResp.Message)
 
 	useCase.AssertExpectations(t)
 }
@@ -136,7 +154,13 @@ func TestGetWeatherHandler_WeatherUnavailable(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Contains(t, rec.Body.String(), "weather service is currently unavailable")
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	// Verify JSON error response structure
+	var errResp dto.ErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Equal(t, "weather service is currently unavailable", errResp.Message)
 
 	useCase.AssertExpectations(t)
 }
@@ -160,7 +184,13 @@ func TestGetWeatherHandler_UnknownError(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.Contains(t, rec.Body.String(), "internal server error")
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	// Verify JSON error response structure
+	var errResp dto.ErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Equal(t, "internal server error", errResp.Message)
 
 	useCase.AssertExpectations(t)
 }

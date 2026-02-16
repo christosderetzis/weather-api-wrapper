@@ -3,6 +3,9 @@ package rate_limiter
 import (
 	"net/http"
 	"sync"
+	"weather-api-wrapper/internal/adapters/input/http/dto"
+
+	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 
 	"golang.org/x/time/rate"
 )
@@ -41,7 +44,8 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 		limiter := rl.getLimiter(ip)
 
 		if !limiter.Allow() {
-			http.Error(w, "Rate limit exceeded. Maximum 30 requests per minute allowed.", http.StatusTooManyRequests)
+			metrics.RateLimitExceeded.Inc()
+			dto.WriteErrorJSON(w, "Rate limit exceeded. Maximum 30 requests per minute allowed.", http.StatusTooManyRequests)
 			return
 		}
 

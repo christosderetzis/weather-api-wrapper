@@ -6,8 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"weather-api-wrapper/internal/adapters/input/http/middleware/metrics"
 )
 
 func TestNewClient(t *testing.T) {
@@ -28,6 +31,7 @@ func TestClient_FetchWeather(t *testing.T) {
 		expectedLocation  string
 		expectedTempC     float64
 		expectedCondition string
+		expectedMetricLbl string // expected label for ExternalAPICallsTotal
 	}{
 		{
 			name:         "Success",
@@ -88,27 +92,31 @@ func TestClient_FetchWeather(t *testing.T) {
 			expectedLocation:  "London",
 			expectedTempC:     15.0,
 			expectedCondition: "Partly cloudy",
+			expectedMetricLbl: "200",
 		},
 		{
-			name:           "Bad request",
-			serverStatus:   http.StatusBadRequest,
-			serverResponse: `{"error": {"message": "Invalid location"}}`,
-			location:       "InvalidLocation",
-			expectError:    true,
+			name:              "Bad request",
+			serverStatus:      http.StatusBadRequest,
+			serverResponse:    `{"error": {"message": "Invalid location"}}`,
+			location:          "InvalidLocation",
+			expectError:       true,
+			expectedMetricLbl: "400",
 		},
 		{
-			name:           "Internal server error",
-			serverStatus:   http.StatusInternalServerError,
-			serverResponse: "internal server error",
-			location:       "London",
-			expectError:    true,
+			name:              "Internal server error",
+			serverStatus:      http.StatusInternalServerError,
+			serverResponse:    "internal server error",
+			location:          "London",
+			expectError:       true,
+			expectedMetricLbl: "500",
 		},
 		{
-			name:           "Invalid JSON response",
-			serverStatus:   http.StatusOK,
-			serverResponse: "not valid json",
-			location:       "London",
-			expectError:    true,
+			name:              "Invalid JSON response",
+			serverStatus:      http.StatusOK,
+			serverResponse:    "not valid json",
+			location:          "London",
+			expectError:       true,
+			expectedMetricLbl: "200",
 		},
 	}
 
@@ -117,7 +125,7 @@ func TestClient_FetchWeather(t *testing.T) {
 			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.serverStatus)
-				w.Write([]byte(tt.serverResponse))
+				_, _ = w.Write([]byte(tt.serverResponse))
 
 				// Verify query parameters
 				assert.Equal(t, tt.location, r.URL.Query().Get("q"))
@@ -127,6 +135,9 @@ func TestClient_FetchWeather(t *testing.T) {
 
 			// Create client with mock server URL
 			client := NewClient("test-key", server.URL)
+
+			// Capture initial metric value
+			initialAPICalls := testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", tt.expectedMetricLbl))
 
 			// Execute
 			ctx := context.Background()
@@ -148,6 +159,9 @@ func TestClient_FetchWeather(t *testing.T) {
 				assert.Equal(t, 82, result.Current.Humidity)
 				assert.False(t, result.Current.IsDay) // is_day: 0 -> false
 			}
+
+			// Verify API call metric was incremented
+			assert.Equal(t, initialAPICalls+1, testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", tt.expectedMetricLbl)))
 		})
 	}
 }
@@ -162,6 +176,9 @@ func TestClient_FetchWeather_ContextCancellation(t *testing.T) {
 
 	client := NewClient("test-key", server.URL)
 
+	// Capture initial metric value
+	initialAPIErrors := testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", "error"))
+
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -171,6 +188,9 @@ func TestClient_FetchWeather_ContextCancellation(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, ErrFailedToFetchWeather)
+
+	// Verify error metric was incremented
+	assert.Equal(t, initialAPIErrors+1, testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", "error")))
 }
 
 func TestClient_FetchWeather_URLEncoding(t *testing.T) {
@@ -180,7 +200,7 @@ func TestClient_FetchWeather_URLEncoding(t *testing.T) {
 		assert.Equal(t, "New York", location) // httptest automatically decodes
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"location": {"name": "New York"},
 			"current": {"temp_c": 20.0, "condition": {"text": "Clear"}}
 		}`))
@@ -189,10 +209,16 @@ func TestClient_FetchWeather_URLEncoding(t *testing.T) {
 
 	client := NewClient("test-key", server.URL)
 
+	// Capture initial metric value
+	initialAPICalls := testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", "200"))
+
 	ctx := context.Background()
 	result, err := client.FetchWeather(ctx, "New York")
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, "New York", result.Location.Name)
+
+	// Verify API call metric was incremented
+	assert.Equal(t, initialAPICalls+1, testutil.ToFloat64(metrics.ExternalAPICallsTotal.WithLabelValues("weatherapi", "200")))
 }
